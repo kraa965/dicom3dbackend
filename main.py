@@ -156,5 +156,5 @@ def upload_file():
 def get_stl_model(filename):
     return send_from_directory(app.config['MODEL_FOLDER'], filename)
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
+if __name__ == '__main__':
+    app.run(debug=True)
