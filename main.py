@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pydicom
 from stl import mesh
+import open3d as o3d  # Используем Open3D для сглаживания
 from tqdm import tqdm
 import gc
 from skimage.measure import marching_cubes
@@ -26,6 +27,19 @@ app.config['MODEL_FOLDER'] = MODEL_FOLDER
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def smooth_mesh_open3d(o3d_mesh, iterations=10):
+    """Сглаживание с использованием Open3D (Laplacian или Taubin filter)"""
+    # Мы увеличиваем количество итераций для улучшения качества
+    o3d_mesh = o3d_mesh.filter_smooth_laplacian(number_of_iterations=iterations)
+    return o3d_mesh
+
+def clear_upload_folder():
+    """Очищает папку uploads после завершения обработки"""
+    for filename in os.listdir(UPLOAD_FOLDER):
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
 
 def dicom_to_stl(dicom_files):
     print("Starting DICOM to STL conversion...")
@@ -78,20 +92,37 @@ def dicom_to_stl(dicom_files):
         print(f"Error during Marching Cubes: {e}")
         return None
 
-    print("Creating STL mesh...")
-    mesh_data = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, face in enumerate(faces):
-        for j in range(3):
-            mesh_data.vectors[i][j] = verts[face[j]]
+    print("Creating Open3D mesh...")
+    # Преобразуем вершины и треугольники в формат Open3D
+    o3d_mesh = o3d.geometry.TriangleMesh()
+    o3d_mesh.vertices = o3d.utility.Vector3dVector(verts)
+    o3d_mesh.triangles = o3d.utility.Vector3iVector(faces)
 
-    stl_filename = os.path.join(MODEL_FOLDER, 'converted_model.stl')
+    # Сглаживаем модель с помощью Open3D
+    print("Smoothing mesh...")
+    o3d_mesh = smooth_mesh_open3d(o3d_mesh, iterations=10)
+
+    # Извлекаем новые вершины и треугольники
+    smooth_verts = np.asarray(o3d_mesh.vertices)
+    smooth_faces = np.asarray(o3d_mesh.triangles)
+
+    print("Saving STL model...")
+    # Сохраняем результат в новый STL файл
+    mesh_data = mesh.Mesh(np.zeros(smooth_faces.shape[0], dtype=mesh.Mesh.dtype))
+    for i, face in enumerate(smooth_faces):
+        for j in range(3):
+            mesh_data.vectors[i][j] = smooth_verts[face[j]]
+
+    stl_filename = os.path.join(MODEL_FOLDER, 'converted_model_smoothed.stl')
     mesh_data.save(stl_filename)
 
-    del mesh_data, verts, faces, data
+    # Очищаем папку uploads после сохранения STL
+    clear_upload_folder()
+
+    del mesh_data, smooth_verts, smooth_faces, data
     gc.collect()
 
     return stl_filename
-
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -121,11 +152,9 @@ def upload_file():
     except Exception as e:
         return jsonify({'error': f'Error during DICOM to STL conversion: {str(e)}'}), 500
 
-
 @app.route('/stl_models/<filename>', methods=['GET'])
 def get_stl_model(filename):
     return send_from_directory(app.config['MODEL_FOLDER'], filename)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
