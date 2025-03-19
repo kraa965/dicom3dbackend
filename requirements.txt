@@ -4,3 +4,5 @@ Flask-Cors~=3.0.9
 pydicom~=3.0.1
 numpy~=2.2.4
 tqdm~=4.67.1
+scikit-image~=0.25.2
+scipy~=1.15.2
