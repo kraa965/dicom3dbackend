@@ -3,13 +3,13 @@ import numpy as np
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pydicom
-from stl import mesh
 import open3d as o3d  # Используем Open3D для сглаживания
 from tqdm import tqdm
 import gc
 from skimage.measure import marching_cubes
 from skimage.transform import resize
 from scipy.ndimage import gaussian_filter
+from stl import mesh as np_mesh  # Используем numpy-stl вместо stl
 
 app = Flask(__name__)
 
@@ -30,7 +30,6 @@ def allowed_file(filename):
 
 def smooth_mesh_open3d(o3d_mesh, iterations=10):
     """Сглаживание с использованием Open3D (Laplacian или Taubin filter)"""
-    # Мы увеличиваем количество итераций для улучшения качества
     o3d_mesh = o3d_mesh.filter_smooth_laplacian(number_of_iterations=iterations)
     return o3d_mesh
 
@@ -107,8 +106,9 @@ def dicom_to_stl(dicom_files):
     smooth_faces = np.asarray(o3d_mesh.triangles)
 
     print("Saving STL model...")
-    # Сохраняем результат в новый STL файл
-    mesh_data = mesh.Mesh(np.zeros(smooth_faces.shape[0], dtype=mesh.Mesh.dtype))
+
+    # Сохраняем результат в новый STL файл с использованием numpy-stl
+    mesh_data = np_mesh.Mesh(np.zeros(smooth_faces.shape[0], dtype=np_mesh.Mesh.dtype))
     for i, face in enumerate(smooth_faces):
         for j in range(3):
             mesh_data.vectors[i][j] = smooth_verts[face[j]]
