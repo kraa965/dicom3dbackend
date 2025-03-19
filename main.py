@@ -13,7 +13,7 @@ from scipy.ndimage import gaussian_filter
 
 app = Flask(__name__)
 
-CORS(app, origins="http://localhost:5173")
+CORS(app)  # Разрешает CORS для всех источников
 
 UPLOAD_FOLDER = 'uploads'
 MODEL_FOLDER = 'stl_models'
@@ -156,5 +156,5 @@ def upload_file():
 def get_stl_model(filename):
     return send_from_directory(app.config['MODEL_FOLDER'], filename)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     app.run(debug=True)
