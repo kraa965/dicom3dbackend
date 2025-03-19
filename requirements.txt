@@ -1,0 +1,6 @@
+Flask==2.2.3
+Werkzeug==2.2.3
+Flask-Cors~=3.0.9
+pydicom~=3.0.1
+numpy~=2.2.4
+tqdm~=4.67.1
